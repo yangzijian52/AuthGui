@@ -41,7 +41,7 @@
 
 ## 📥 安装与使用 (Installation)
 
-1.  下载 `AuthGui-1.0.jar`。
+1.  下载 `AuthGui-1.x.jar`。
 2.  将文件放入服务器的 `plugins` 文件夹。
 3.  确保服务器已安装 `AuthMe` 和 `Floodgate`。
 4.  重启服务器。
@@ -95,4 +95,5 @@ com.example.authgui
 *   如果你有更好的想法，欢迎 Fork 本项目。<br>
 
 ## 📄 开源协议
+
 本项目采用 MIT License 开源。
