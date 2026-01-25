@@ -88,6 +88,19 @@ com.example.authgui
     ├── BedrockManager.java  # 处理基岩版表单逻辑 (Floodgate API)
     └── JavaGuiManager.java  # 处理Java版铁砧逻辑 (AnvilGUI)
 ```
+## 📂 实机演示
+
+### JAVA端
+| 注册                          | 登录                      |
+|-----------------------------|-------------------------|
+| ![img_1.png](img/img_1.png) | ![img.png](img/img.png) |
+### 基岩端
+| 注册                         | 登录                      |
+|----------------------------|-------------------------|
+| ![img_2.png](img/img_2.png) | ![img_3.png](img/img_3.png) |
+
+
+
 
 ## 🤝 贡献与反馈
 这是一个开源项目，欢迎提交 Issue 或 Pull Request 来改进代码。<br>
@@ -95,5 +108,4 @@ com.example.authgui
 *   如果你有更好的想法，欢迎 Fork 本项目。<br>
 
 ## 📄 开源协议
-
 本项目采用 MIT License 开源。
