@@ -1,7 +1,7 @@
 name: AuthGui
-version: 1.0
+version: ${project.version}
 main: com.example.authgui.AuthGuiPlugin
-api-version: 1.20
+api-version: 1.21
 depend: [AuthMe]
 softdepend: [floodgate]
 commands:
