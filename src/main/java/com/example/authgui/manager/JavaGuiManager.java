@@ -2,150 +2,144 @@ package com.example.authgui.manager;
 
 import com.example.authgui.AuthGuiPlugin;
 import fr.xephi.authme.api.v3.AuthMeApi;
-import net.wesjd.anvilgui.AnvilGUI;
 import org.bukkit.Bukkit;
-import org.bukkit.Material;
+import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
-import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
 
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class JavaGuiManager {
 
-    // 防止从步骤1跳到步骤2时，被判定为“关闭菜单”而强制弹回
-    private static final Set<UUID> switchingPlayers = new HashSet<>();
-
-    public static void openAuthGui(Player player) {
-        if (!player.isOnline()) return;
-
-        AuthMeApi authMe = AuthMeApi.getInstance();
-        if (authMe.isRegistered(player.getName())) {
-            openLoginGui(player);
-        } else {
-            openRegisterGuiStep1(player);
-        }
+    private enum Step {
+        LOGIN,
+        REGISTER_PASSWORD,
+        REGISTER_CONFIRM
     }
 
-    // --- 通用关闭处理 ---
-    private static void handleClose(Player player) {
-        // 如果玩家在这个名单里，说明他是为了去下一步才关的，不仅不管，还要把他移出名单
-        if (switchingPlayers.contains(player.getUniqueId())) {
-            switchingPlayers.remove(player.getUniqueId());
+    private record Session(Step step, String firstPassword) {}
+
+    private static final Map<UUID, Session> SESSIONS = new ConcurrentHashMap<>();
+
+    public static void openAuthGui(Player player) {
+        if (!player.isOnline()) {
             return;
         }
 
-        // 正常防逃逸逻辑
+        AuthMeApi authMe = AuthMeApi.getInstance();
+        if (authMe.isAuthenticated(player)) {
+            clearSession(player.getUniqueId());
+            return;
+        }
+
+        if (authMe.isRegistered(player.getName())) {
+            startLogin(player);
+        } else {
+            startRegister(player);
+        }
+    }
+
+    public static boolean handleChat(Player player, String message) {
+        Session session = SESSIONS.get(player.getUniqueId());
+        if (session == null) {
+            return false;
+        }
+
+        String input = message == null ? "" : message.trim();
+        Bukkit.getScheduler().runTask(AuthGuiPlugin.getInstance(), () -> processInput(player, session, input));
+        return true;
+    }
+
+    public static void clearSession(UUID uuid) {
+        SESSIONS.remove(uuid);
+    }
+
+    private static void processInput(Player player, Session session, String input) {
+        if (!player.isOnline()) {
+            clearSession(player.getUniqueId());
+            return;
+        }
+
+        if (AuthMeApi.getInstance().isAuthenticated(player)) {
+            clearSession(player.getUniqueId());
+            return;
+        }
+
+        switch (session.step()) {
+            case LOGIN -> handleLoginInput(player, input);
+            case REGISTER_PASSWORD -> handleRegisterPassword(player, input);
+            case REGISTER_CONFIRM -> handleRegisterConfirm(player, session.firstPassword(), input);
+        }
+    }
+
+    private static void startLogin(Player player) {
+        SESSIONS.put(player.getUniqueId(), new Session(Step.LOGIN, null));
+        player.sendMessage(ChatColor.GOLD + "[AuthGui] " + ChatColor.YELLOW + "请直接在聊天栏输入你的登录密码。");
+        player.sendMessage(ChatColor.GRAY + "输入内容不会公开显示。");
+    }
+
+    private static void startRegister(Player player) {
+        SESSIONS.put(player.getUniqueId(), new Session(Step.REGISTER_PASSWORD, null));
+        player.sendMessage(ChatColor.GOLD + "[AuthGui] " + ChatColor.YELLOW + "请直接在聊天栏输入你要注册的密码。");
+        player.sendMessage(ChatColor.GRAY + "输入内容不会公开显示。");
+    }
+
+    private static void handleLoginInput(Player player, String input) {
+        if (input.isEmpty()) {
+            player.sendMessage(ChatColor.RED + "密码不能为空，请重新输入。");
+            startLogin(player);
+            return;
+        }
+
+        player.chat("/login " + input);
         Bukkit.getScheduler().runTaskLater(AuthGuiPlugin.getInstance(), () -> {
             if (player.isOnline() && !AuthMeApi.getInstance().isAuthenticated(player)) {
-                openAuthGui(player);
+                player.sendMessage(ChatColor.RED + "登录失败，请重新输入密码。");
+                startLogin(player);
+            } else {
+                clearSession(player.getUniqueId());
             }
-        }, 10L);
+        }, 20L);
     }
 
-    // --- 登录界面 ---
-    private static void openLoginGui(Player player) {
-        new AnvilGUI.Builder()
-                .plugin(AuthGuiPlugin.getInstance())
-                .title("登录 - 输入密码")
-                .text(" ") // 空格占位，玩家不需要删，直接输即可
-                .itemLeft(createGuiItem(Material.PAPER, " "))
-                .onClick((slot, stateSnapshot) -> {
-                    if (slot != AnvilGUI.Slot.OUTPUT) {
-                        return Collections.emptyList();
-                    }
-
-                    String password = stateSnapshot.getText().trim();
-                    if (password.isEmpty()) {
-                        return Collections.singletonList(AnvilGUI.ResponseAction.replaceInputText("密码不能为空"));
-                    }
-
-                    // 登录不需要标记切换，因为登录成功窗口关闭是正常的
-                    player.chat("/login " + password);
-                    return Collections.singletonList(AnvilGUI.ResponseAction.close());
-                })
-                .onClose(stateSnapshot -> handleClose(stateSnapshot.getPlayer()))
-                .open(player);
-    }
-
-    // --- 注册第一步 ---
-    private static void openRegisterGuiStep1(Player player) {
-        new AnvilGUI.Builder()
-                .plugin(AuthGuiPlugin.getInstance())
-                .title("注册(1/2) - 输入新密码")
-                .text(" ")
-                .itemLeft(createGuiItem(Material.NAME_TAG, "步骤1"))
-                .onClick((slot, stateSnapshot) -> {
-                    if (slot != AnvilGUI.Slot.OUTPUT) {
-                        return Collections.emptyList();
-                    }
-
-                    String pass1 = stateSnapshot.getText().trim();
-                    if (pass1.isEmpty()) {
-                        return Collections.singletonList(AnvilGUI.ResponseAction.replaceInputText("不能空白"));
-                    }
-
-                    // 【关键】标记该玩家正在切换界面，防止触发 onClose 的拦截
-                    switchingPlayers.add(player.getUniqueId());
-
-                    // 切换到第二步
-                    AuthGuiPlugin.getInstance().getServer().getScheduler().runTask(AuthGuiPlugin.getInstance(), () -> {
-                        openRegisterGuiStep2(player, pass1);
-                    });
-
-                    return Collections.singletonList(AnvilGUI.ResponseAction.close());
-                })
-                .onClose(stateSnapshot -> handleClose(stateSnapshot.getPlayer()))
-                .open(player);
-    }
-
-    // --- 注册第二步 ---
-    private static void openRegisterGuiStep2(Player player, String firstPass) {
-        new AnvilGUI.Builder()
-                .plugin(AuthGuiPlugin.getInstance())
-                .title("注册(2/2) - 确认密码")
-                .text(" ")
-                .itemLeft(createGuiItem(Material.NAME_TAG, "步骤2"))
-                .onClick((slot, stateSnapshot) -> {
-                    if (slot != AnvilGUI.Slot.OUTPUT) {
-                        return Collections.emptyList();
-                    }
-
-                    String pass2 = stateSnapshot.getText().trim();
-
-                    if (pass2.equals(firstPass)) {
-                        player.chat("/reg " + firstPass + " " + pass2);
-
-                        // 注册成功后，延迟检测登录状态
-                        // 这里我们不标记 switching，因为窗口关闭后，如果没登录，正是我们需要 handleClose 介入的时候
-                        // 它会自动检测：如果 AuthMe 自动登录了 -> 没事；如果没有 -> 自动弹登录窗
-                        return Collections.singletonList(AnvilGUI.ResponseAction.close());
-                    } else {
-                        player.sendMessage("§c两次密码不一致，请重试。");
-
-                        // 输错重来，也算是一种“切换”，防止被 handleClose 拦截导致逻辑混乱
-                        switchingPlayers.add(player.getUniqueId());
-
-                        AuthGuiPlugin.getInstance().getServer().getScheduler().runTask(AuthGuiPlugin.getInstance(), () -> {
-                            openRegisterGuiStep1(player);
-                        });
-                        return Collections.singletonList(AnvilGUI.ResponseAction.close());
-                    }
-                })
-                .onClose(stateSnapshot -> handleClose(stateSnapshot.getPlayer()))
-                .open(player);
-    }
-
-    private static ItemStack createGuiItem(Material material, String name) {
-        ItemStack item = new ItemStack(material);
-        ItemMeta meta = item.getItemMeta();
-        if (meta != null) {
-            meta.setDisplayName("§r" + name);
-            item.setItemMeta(meta);
+    private static void handleRegisterPassword(Player player, String input) {
+        if (input.isEmpty()) {
+            player.sendMessage(ChatColor.RED + "密码不能为空，请重新输入。");
+            startRegister(player);
+            return;
         }
-        return item;
+
+        SESSIONS.put(player.getUniqueId(), new Session(Step.REGISTER_CONFIRM, input));
+        player.sendMessage(ChatColor.GOLD + "[AuthGui] " + ChatColor.YELLOW + "请再次输入密码以确认注册。");
+    }
+
+    private static void handleRegisterConfirm(Player player, String firstPassword, String input) {
+        if (input.isEmpty()) {
+            player.sendMessage(ChatColor.RED + "确认密码不能为空，请重新注册。");
+            startRegister(player);
+            return;
+        }
+
+        if (!input.equals(firstPassword)) {
+            player.sendMessage(ChatColor.RED + "两次密码不一致，请重新注册。");
+            startRegister(player);
+            return;
+        }
+
+        player.chat("/reg " + firstPassword + " " + input);
+        Bukkit.getScheduler().runTaskLater(AuthGuiPlugin.getInstance(), () -> {
+            if (!player.isOnline()) {
+                clearSession(player.getUniqueId());
+                return;
+            }
+
+            if (!AuthMeApi.getInstance().isAuthenticated(player)) {
+                player.sendMessage(ChatColor.GREEN + "注册成功，请继续输入密码完成登录。");
+                startLogin(player);
+            } else {
+                clearSession(player.getUniqueId());
+            }
+        }, 20L);
     }
 }

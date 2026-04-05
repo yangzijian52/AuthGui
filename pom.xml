@@ -6,7 +6,7 @@
 
     <groupId>com.example</groupId>
     <artifactId>AuthGui</artifactId>
-    <version>1.0.2</version>
+    <version>1.0.1</version>
     <packaging>jar</packaging>
 
     <properties>
@@ -15,56 +15,38 @@
     </properties>
 
     <repositories>
-        <!-- Paper API -->
         <repository>
             <id>papermc</id>
             <url>https://repo.papermc.io/repository/maven-public/</url>
         </repository>
-        <!-- AuthMe API -->
         <repository>
             <id>codemc-repo</id>
             <url>https://repo.codemc.io/repository/maven-public/</url>
         </repository>
-        <!-- Geyser/Floodgate API -->
         <repository>
             <id>opencollab-main</id>
             <url>https://repo.opencollab.dev/main/</url>
         </repository>
-        <!-- AnvilGUI -->
-        <repository>
-            <id>wesjd-repo</id>
-            <url>https://mvn.wesjd.net/</url>
-        </repository>
     </repositories>
 
     <dependencies>
-        <!-- Paper API -->
         <dependency>
             <groupId>io.papermc.paper</groupId>
             <artifactId>paper-api</artifactId>
             <version>26.1.1.build.20-alpha</version>
             <scope>provided</scope>
         </dependency>
-
-        <!-- AuthMe API -->
         <dependency>
             <groupId>fr.xephi</groupId>
             <artifactId>authme</artifactId>
             <version>5.6.0-SNAPSHOT</version>
             <scope>provided</scope>
         </dependency>
-        <!-- Floodgate API -->
         <dependency>
             <groupId>org.geysermc.floodgate</groupId>
             <artifactId>api</artifactId>
             <version>2.2.3-SNAPSHOT</version>
             <scope>provided</scope>
-        </dependency>
-        <!-- AnvilGUI -->
-        <dependency>
-            <groupId>net.wesjd</groupId>
-            <artifactId>anvilgui</artifactId>
-            <version>1.10.12-SNAPSHOT</version>
         </dependency>
     </dependencies>
 
@@ -88,30 +70,6 @@
                     <source>${java.version}</source>
                     <target>${java.version}</target>
                 </configuration>
-            </plugin>
-            <!-- 关键：打包插件，必须包含 AnvilGUI -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-shade-plugin</artifactId>
-                <version>3.6.2</version>
-                <executions>
-                    <execution>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>shade</goal>
-                        </goals>
-                        <configuration>
-                            <createDependencyReducedPom>false</createDependencyReducedPom>
-                            <relocations>
-                                <!-- 防止与其他插件的 AnvilGUI 冲突 -->
-                                <relocation>
-                                    <pattern>net.wesjd.anvilgui</pattern>
-                                    <shadedPattern>com.example.authgui.anvilgui</shadedPattern>
-                                </relocation>
-                            </relocations>
-                        </configuration>
-                    </execution>
-                </executions>
             </plugin>
         </plugins>
     </build>
