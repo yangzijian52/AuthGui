@@ -12,6 +12,9 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class JavaGuiManager {
 
+    // TODO: This is a temporary fallback for Paper 26.1.x.
+    // Restore a proper Java GUI flow after finding a stable GUI-compatible solution.
+
     private enum Step {
         LOGIN,
         REGISTER_PASSWORD,
